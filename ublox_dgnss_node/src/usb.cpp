@@ -223,12 +223,24 @@ libusb_device_handle * Connection::open_device_with_serial_string(
       break;
     }
 
-    if (sizeof(serial_num_string) >= 0) {
-      if (serial_str == serial_num_string) {
-        // Device found and matched
+    if (serial_str == serial_num_string) {
+      // Matched via iSerialNumber
+      break;
+    }
+
+    // iSerialNumber is empty on F9P/F9R — fall back to iManufacturer, which
+    // can be set via UBX-CFG-USB and persists across power cycles.
+    if (strlen(serial_num_string) == 0 && desc.iManufacturer != 0) {
+      char manufacturer_string[SERIAL_STRING_BUFFER_SIZE] = {};
+      libusb_get_string_descriptor_ascii(
+        devHandle, desc.iManufacturer,
+        reinterpret_cast<unsigned char *>(manufacturer_string), SERIAL_STRING_BUFFER_SIZE);
+      if (serial_str == manufacturer_string) {
+        // Matched via iManufacturer (F9P fallback)
         break;
       }
     }
+
     // Close the device if it didn't match
     libusb_close(devHandle);
     devHandle = nullptr;
